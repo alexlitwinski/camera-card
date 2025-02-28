@@ -1,4 +1,10 @@
-/**
+// Função para capturar uma imagem
+  _captureSnapshot() {
+    this._hass.callService('camera', 'snapshot', {
+      entity_id: this.config.camera_entity,
+      filename: `/config/www/camera_snapshots/${this.config.camera_entity.split('.')[1]}_${new Date().toISOString().replace(/:/g, '-')}.jpg`
+    });
+  }/**
  * Camera Card para Home Assistant
  * 
  * Este componente mostra:
@@ -28,10 +34,6 @@ class CameraCard extends HTMLElement {
 
   // Configurações do card
   setConfig(config) {
-    if (!config.camera_entity) {
-      throw new Error('Você precisa definir uma entidade de câmera (camera_entity)');
-    }
-    
     if (!config.fps_sensor) {
       throw new Error('Você precisa definir um sensor de FPS (fps_sensor)');
     }
@@ -50,6 +52,11 @@ class CameraCard extends HTMLElement {
     
     if (config.rssi_sensor === undefined && config.snr_sensor === undefined) {
       throw new Error('Você precisa definir pelo menos um sensor de sinal (rssi_sensor ou snr_sensor)');
+    }
+    
+    // A URL RTSP agora é obrigatória em vez da entidade de câmera
+    if (!config.rtsp_url) {
+      throw new Error('Você precisa definir a URL RTSP da câmera (rtsp_url)');
     }
     
     this.config = config;
@@ -90,12 +97,19 @@ class CameraCard extends HTMLElement {
     });
   }
 
-  // Função para capturar uma imagem
-  _captureSnapshot() {
-    this._hass.callService('camera', 'snapshot', {
-      entity_id: this.config.camera_entity,
-      filename: `/config/www/camera_snapshots/${this.config.camera_entity.split('.')[1]}_${new Date().toISOString().replace(/:/g, '-')}.jpg`
-    });
+  // Método para obter o estilo de fundo baseado no FPS
+  _getBackgroundStyle(fps) {
+    // Converte o valor para número
+    const fpsValue = parseFloat(fps);
+    
+    // Define o estilo com base no valor do FPS
+    if (fpsValue > 0) {
+      return 'background-color: #d4edff;'; // Azul claro quando FPS > 0
+    } else if (fpsValue === 0) {
+      return 'background-color: #ffe5e5;'; // Vermelho claro quando FPS = 0
+    } else {
+      return ''; // Valor padrão para outros casos
+    }
   }
 
   // Renderiza o conteúdo do card
@@ -104,22 +118,21 @@ class CameraCard extends HTMLElement {
       return;
     }
     
-    const cameraEntity = this.config.camera_entity;
     const fpsSensor = this.config.fps_sensor;
     const cpuSensor = this.config.cpu_sensor;
     const powerSwitch = this.config.power_switch;
     const apEntity = this.config.ap_entity;
     const rssiSensor = this.config.rssi_sensor;
     const snrSensor = this.config.snr_sensor;
+    const rtspUrl = this.config.rtsp_url;
     
     // Obtém estados das entidades
-    const cameraState = this._hass.states[cameraEntity];
     const fpsState = this._hass.states[fpsSensor];
     const cpuState = this._hass.states[cpuSensor];
     const switchState = this._hass.states[powerSwitch];
     const apState = this._hass.states[apEntity];
     
-    if (!cameraState || !fpsState || !cpuState || !switchState || !apState) {
+    if (!fpsState || !cpuState || !switchState || !apState) {
       this.shadowRoot.innerHTML = `
         <ha-card header="Camera Card - Erro">
           <div class="card-content">
@@ -135,13 +148,16 @@ class CameraCard extends HTMLElement {
     const snrState = snrSensor ? this._hass.states[snrSensor] : null;
     
     // Define título do card
-    const cardTitle = this.config.title || cameraState.attributes.friendly_name || 'Camera Card';
+    const cardTitle = this.config.title || 'Camera Card';
     
     // Obtém valores dos sensores
     const fps = fpsState.state;
     const cpu = parseFloat(cpuState.state);
     const cpuPercent = Math.min(cpu, 100); // Para a barra de progresso
     const isPowerOn = switchState.state === 'on';
+    
+    // Obtém o estilo de fundo baseado no FPS
+    const backgroundStyle = this._getBackgroundStyle(fps);
     
     // Informações de conexão
     const rssiValue = rssiState ? parseFloat(rssiState.state) : null;
@@ -187,6 +203,19 @@ class CameraCard extends HTMLElement {
           box-shadow: 0 4px 15px var(--shadow-color);
           overflow: hidden;
           transition: transform 0.2s, box-shadow 0.2s;
+          ${backgroundStyle}
+        }
+        
+        .camera-video {
+          width: 100%;
+          border-radius: 8px;
+          display: block;
+        }
+        
+        .camera-offline-container {
+          width: 100%;
+          text-align: center;
+          color: #666;
         }
         
         ha-card:hover {
@@ -458,14 +487,55 @@ class CameraCard extends HTMLElement {
         
         <div class="card-content">
           <div class="camera-container">
-            <img 
-              class="camera-image" 
-              src="${isPowerOn ? `/api/camera_proxy/${cameraEntity}?${timestamp}` : '#'}" 
-              style="${!isPowerOn ? 'filter: grayscale(1) brightness(0.7);' : ''}"
-              alt="Camera Feed"
-              onerror="this.src='/local/camera-card/camera-offline.png'; this.onerror=null;"
-            >
-            ${!isPowerOn ? '<div class="camera-offline">Câmera desligada</div>' : ''}
+            ${isPowerOn ? `
+            <video 
+              class="camera-video" 
+              autoplay 
+              muted 
+              playsinline
+              style="width: 100%; height: auto; display: block;"
+              id="rtsp-video"
+              poster="/api/resources/static/images/placeholder.png"
+            ></video>
+            <script>
+              // Função para inicializar o player de vídeo
+              (function initVideo() {
+                const videoElement = document.getElementById('rtsp-video');
+                if (videoElement && window.Hls && window.Hls.isSupported()) {
+                  const hls = new window.Hls();
+                  // URL convertida RTSP -> HLS via servidor ou proxy
+                  hls.loadSource("${this.config.rtsp_url.replace('rtsp://', 'http://').replace(':554', ':8888')}/index.m3u8");
+                  hls.attachMedia(videoElement);
+                  hls.on(window.Hls.Events.MANIFEST_PARSED, function() {
+                    videoElement.play().catch(e => {
+                      console.warn('Autoplay failed:', e);
+                    });
+                  });
+                } else if (videoElement && videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                  // Safari suporta HLS nativamente
+                  videoElement.src = "${this.config.rtsp_url.replace('rtsp://', 'http://').replace(':554', ':8888')}/index.m3u8";
+                  videoElement.addEventListener('loadedmetadata', function() {
+                    videoElement.play().catch(e => {
+                      console.warn('Autoplay failed:', e);
+                    });
+                  });
+                } else {
+                  // Fallback para um iframe ou mensagem de erro
+                  const container = videoElement.parentNode;
+                  container.innerHTML = 
+                    '<div style="padding: 20px; text-align: center; background-color: #f0f0f0; height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px;">' +
+                    '<ha-icon icon="mdi:video-off" style="font-size: 48px; color: #999; margin-bottom: 16px;"></ha-icon>' +
+                    '<div>Este navegador não suporta a reprodução de vídeo RTSP. Considere usar um conversor RTSP para HLS.</div>' +
+                    '</div>';
+                }
+              })();
+            </script>
+            ` : `
+            <div class="camera-offline-container" style="height: 240px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #f0f0f0; border-radius: 8px;">
+              <ha-icon icon="mdi:video-off" style="font-size: 48px; color: #999; margin-bottom: 16px;"></ha-icon>
+              <div class="camera-offline">Câmera desligada</div>
+            </div>
+            `}
             ${isPowerOn ? `
             <div class="camera-controls-overlay">
               <button class="camera-control-btn tooltip" id="fullscreen-btn">
