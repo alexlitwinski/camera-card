@@ -176,15 +176,11 @@ class CameraCard extends HTMLElement {
           color: var(--text-color);
           box-shadow: 0 4px 15px var(--shadow-color);
           overflow: hidden;
-          transition: box-shadow 0.2s;
+          /* Removido transition para evitar piscadas */
           ${backgroundStyle}
-          /* Removido transform da transição para evitar tremulação */
         }
         
-        ha-card:hover {
-          /* Removido translateY para evitar tremulação */
-          box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-        }
+        /* Removido completamente o ha-card:hover para evitar piscadas */
         
         .card-header {
           padding: 14px 20px; /* Reduzido o padding para deixar mais compacto */
@@ -321,19 +317,11 @@ class CameraCard extends HTMLElement {
           display: flex;
           align-items: center;
           gap: 8px;
-          transition: background-color 0.2s;
+          /* Removido transition para evitar piscadas */
           box-shadow: 0 4px 6px rgba(75, 123, 236, 0.2);
-          /* Removido transform da transição para evitar tremulação */
         }
         
-        .reconnect-button:hover {
-          background-color: #3867d6;
-          /* Removido translateY para evitar tremulação */
-        }
-        
-        .reconnect-button:active {
-          /* Mantém sem transform para consistência */
-        }
+        /* Removido hover e active states para evitar piscadas */
         
         .switch-container {
           display: flex;
