@@ -32,6 +32,10 @@ class CameraCard extends HTMLElement {
       throw new Error('Você precisa definir um sensor de FPS (fps_sensor)');
     }
     
+    if (!config.process_fps_sensor) {
+      throw new Error('Você precisa definir um sensor de process FPS (process_fps_sensor)');
+    }
+    
     if (!config.cpu_sensor) {
       throw new Error('Você precisa definir um sensor de uso de CPU (cpu_sensor)');
     }
@@ -79,17 +83,18 @@ class CameraCard extends HTMLElement {
   }
 
   // Método para obter o estilo de fundo baseado no FPS
-  _getBackgroundStyle(fps) {
-    // Converte o valor para número
-    const fpsValue = parseFloat(fps);
+  _getBackgroundStyle(processFps, detectionFps) {
+    // Converte os valores para número
+    const processFpsValue = parseFloat(processFps);
+    const detectionFpsValue = parseFloat(detectionFps);
     
-    // Define o estilo com base no valor do FPS
-    if (fpsValue > 0) {
-      return 'background-color: #d4edff;'; // Azul claro quando FPS > 0
-    } else if (fpsValue === 0) {
-      return 'background-color: #ffe5e5;'; // Vermelho claro quando FPS = 0
+    // Define o estilo com base nos valores dos FPS
+    if (processFpsValue === 0) {
+      return 'background-color: #ffe5e5;'; // Vermelho claro quando process_fps = 0
+    } else if (detectionFpsValue > 0) {
+      return 'background-color: #d4edff;'; // Azul claro quando detection_fps > 0
     } else {
-      return ''; // Valor padrão para outros casos
+      return 'background-color: #ffffff;'; // Branco para outros casos
     }
   }
 
