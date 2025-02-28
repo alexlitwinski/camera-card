@@ -44,8 +44,8 @@ class CameraCard extends HTMLElement {
       throw new Error('Você precisa definir um switch de alimentação (power_switch)');
     }
     
-    if (!config.reconnect_service) {
-      throw new Error('Você precisa definir um serviço para reconectar a câmera (reconnect_service)');
+    if (!config.mac_address) {
+      throw new Error('Você precisa definir o endereço MAC do dispositivo (mac_address)');
     }
     
     this.config = config;
@@ -60,9 +60,8 @@ class CameraCard extends HTMLElement {
 
   // Função para reconectar a câmera
   _reconnectCamera() {
-    const [domain, service] = this.config.reconnect_service.split('.');
-    this._hass.callService(domain, service, {
-      entity_id: this.config.camera_entity
+    this._hass.callService('tplink_omada', 'reconnect_client', {
+      mac: this.config.mac_address
     });
   }
 
@@ -429,7 +428,7 @@ class CameraCard extends HTMLElement {
           <div class="camera-container">
             <img 
               class="camera-image" 
-              src="${isPowerOn ? `/api/camera_proxy/${cameraEntity}?token=${this._hass.connection.options.auth.access_token}&${timestamp}` : '#'}" 
+              src="${isPowerOn ? `/api/camera_proxy/${cameraEntity}?${timestamp}` : '#'}" 
               style="${!isPowerOn ? 'filter: grayscale(1) brightness(0.7);' : ''}"
               alt="Camera Feed"
             >
