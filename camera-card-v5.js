@@ -8,7 +8,7 @@
  * - Botão para reconectar a câmera
  * - Switch para ligar/desligar a alimentação da câmera
  * 
- * Versão: 1.2.0
+ * Versão: 1.2.1
  * Tema: Claro
  */
 
@@ -156,9 +156,6 @@ class CameraCard extends HTMLElement {
     const radioType = apState.attributes.radio || '';
     const ssid = apState.attributes.ssid || '';
     
-    // Material Icons para o Home Assistant que já estão disponíveis
-    // Não precisamos carregar uma biblioteca externa de ícones
-    
     // Cria o template do card
     const cardHTML = `
       <style>
@@ -179,17 +176,18 @@ class CameraCard extends HTMLElement {
           color: var(--text-color);
           box-shadow: 0 4px 15px var(--shadow-color);
           overflow: hidden;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: box-shadow 0.2s;
           ${backgroundStyle}
+          /* Removido transform da transição para evitar tremulação */
         }
         
         ha-card:hover {
-          transform: translateY(-5px);
+          /* Removido translateY para evitar tremulação */
           box-shadow: 0 8px 25px rgba(0,0,0,0.12);
         }
         
         .card-header {
-          padding: 18px 24px;
+          padding: 14px 20px; /* Reduzido o padding para deixar mais compacto */
           background-color: var(--background-color);
           color: var(--text-color);
           font-weight: 500;
@@ -203,6 +201,7 @@ class CameraCard extends HTMLElement {
         .header-left {
           display: flex;
           align-items: center;
+          width: 100%; /* Para ocupar todo o espaço agora que removemos o ícone */
         }
         
         .header-icon {
@@ -230,21 +229,21 @@ class CameraCard extends HTMLElement {
         }
         
         .card-content {
-          padding: 20px 24px;
+          padding: 16px 20px; /* Reduzido o padding para deixar mais compacto */
         }
         
         .info-section {
           background-color: var(--secondary-background-color);
           border-radius: 10px;
-          padding: 15px;
-          margin-bottom: 20px;
+          padding: 12px; /* Reduzido o padding */
+          margin-bottom: 15px; /* Reduzido o margin */
         }
         
         .info-title {
           font-size: 14px;
           font-weight: 500;
           color: var(--secondary-text-color);
-          margin-bottom: 10px;
+          margin-bottom: 8px; /* Reduzido o margin */
           display: flex;
           align-items: center;
         }
@@ -257,7 +256,7 @@ class CameraCard extends HTMLElement {
         .info-row {
           display: flex;
           justify-content: space-between;
-          margin: 12px 0;
+          margin: 8px 0; /* Reduzido o margin */
           color: var(--text-color);
           font-size: 14px;
           align-items: center;
@@ -301,7 +300,7 @@ class CameraCard extends HTMLElement {
         }
         
         .controls-section {
-          margin-top: 20px;
+          margin-top: 15px; /* Reduzido o margin */
         }
         
         .controls-row {
@@ -315,24 +314,25 @@ class CameraCard extends HTMLElement {
           color: white;
           border: none;
           border-radius: 8px;
-          padding: 10px 20px;
+          padding: 8px 16px; /* Reduzido o padding */
           cursor: pointer;
           font-size: 14px;
           font-weight: 500;
           display: flex;
           align-items: center;
           gap: 8px;
-          transition: background-color 0.2s, transform 0.1s;
+          transition: background-color 0.2s;
           box-shadow: 0 4px 6px rgba(75, 123, 236, 0.2);
+          /* Removido transform da transição para evitar tremulação */
         }
         
         .reconnect-button:hover {
           background-color: #3867d6;
-          transform: translateY(-2px);
+          /* Removido translateY para evitar tremulação */
         }
         
         .reconnect-button:active {
-          transform: translateY(0);
+          /* Mantém sem transform para consistência */
         }
         
         .switch-container {
@@ -347,32 +347,7 @@ class CameraCard extends HTMLElement {
           font-weight: 500;
         }
         
-        .tooltip {
-          position: relative;
-          display: inline-block;
-        }
-
-        .tooltip .tooltiptext {
-          visibility: hidden;
-          width: 120px;
-          background-color: var(--text-color);
-          color: white;
-          text-align: center;
-          border-radius: 6px;
-          padding: 5px 0;
-          position: absolute;
-          z-index: 1;
-          bottom: 125%;
-          left: 50%;
-          margin-left: -60px;
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-
-        .tooltip:hover .tooltiptext {
-          visibility: visible;
-          opacity: 1;
-        }
+        /* Removido o tooltip que causava tremulação */
         
         /* Hack para ajustar a aparência do switch */
         ha-switch {
@@ -387,10 +362,7 @@ class CameraCard extends HTMLElement {
             ${cardTitle}
             <span class="status-indicator ${isPowerOn ? 'status-online' : 'status-offline'}"></span>
           </div>
-          <div class="tooltip">
-            <ha-icon icon="mdi:information-outline" style="color: var(--primary-color); cursor: pointer;"></ha-icon>
-            <span class="tooltiptext">IP: ${ipAddress}<br>MAC: ${macAddress}</span>
-          </div>
+          <!-- Removido o ícone de informações -->
         </div>
         
         <div class="card-content">
