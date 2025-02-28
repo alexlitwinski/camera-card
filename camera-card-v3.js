@@ -44,8 +44,12 @@ class CameraCard extends HTMLElement {
       throw new Error('Você precisa definir um switch de alimentação (power_switch)');
     }
     
-    if (!config.mac_address) {
-      throw new Error('Você precisa definir o endereço MAC do dispositivo (mac_address)');
+    if (!config.ap_entity) {
+      throw new Error('Você precisa definir a entidade do access point (ap_entity)');
+    }
+    
+    if (config.rssi_sensor === undefined && config.snr_sensor === undefined) {
+      throw new Error('Você precisa definir pelo menos um sensor de sinal (rssi_sensor ou snr_sensor)');
     }
     
     this.config = config;
@@ -60,8 +64,11 @@ class CameraCard extends HTMLElement {
 
   // Função para reconectar a câmera
   _reconnectCamera() {
+    const apState = this._hass.states[this.config.ap_entity];
+    const macAddress = apState.attributes.mac || '';
+    
     this._hass.callService('tplink_omada', 'reconnect_client', {
-      mac: this.config.mac_address
+      mac: macAddress
     });
   }
 
@@ -101,14 +108,18 @@ class CameraCard extends HTMLElement {
     const fpsSensor = this.config.fps_sensor;
     const cpuSensor = this.config.cpu_sensor;
     const powerSwitch = this.config.power_switch;
+    const apEntity = this.config.ap_entity;
+    const rssiSensor = this.config.rssi_sensor;
+    const snrSensor = this.config.snr_sensor;
     
     // Obtém estados das entidades
     const cameraState = this._hass.states[cameraEntity];
     const fpsState = this._hass.states[fpsSensor];
     const cpuState = this._hass.states[cpuSensor];
     const switchState = this._hass.states[powerSwitch];
+    const apState = this._hass.states[apEntity];
     
-    if (!cameraState || !fpsState || !cpuState || !switchState) {
+    if (!cameraState || !fpsState || !cpuState || !switchState || !apState) {
       this.shadowRoot.innerHTML = `
         <ha-card header="Camera Card - Erro">
           <div class="card-content">
@@ -119,35 +130,54 @@ class CameraCard extends HTMLElement {
       return;
     }
     
+    // Obtém informações adicionais
+    const rssiState = rssiSensor ? this._hass.states[rssiSensor] : null;
+    const snrState = snrSensor ? this._hass.states[snrSensor] : null;
+    
     // Define título do card
     const cardTitle = this.config.title || cameraState.attributes.friendly_name || 'Camera Card';
     
     // Obtém valores dos sensores
     const fps = fpsState.state;
     const cpu = parseFloat(cpuState.state);
-    const cpuPercent = (cpu / 100) * 100; // Para a barra de progresso
+    const cpuPercent = Math.min(cpu, 100); // Para a barra de progresso
     const isPowerOn = switchState.state === 'on';
+    
+    // Informações de conexão
+    const rssiValue = rssiState ? parseFloat(rssiState.state) : null;
+    const snrValue = snrState ? parseFloat(snrState.state) : null;
+    
+    // Converte RSSI (dBm) para percentual (aproximado)
+    // Fórmula: 2 * (dBm + 100), limitado entre 0 e 100
+    const rssiPercent = rssiValue !== null ? Math.min(Math.max(2 * (rssiValue + 100), 0), 100) : null;
+    
+    // Obtém informações do AP
+    const apName = apState.attributes.ap_name || 'Desconhecido';
+    const apMac = apState.attributes.ap_mac || '';
+    const macAddress = apState.attributes.mac || '';
+    const ipAddress = apState.attributes.ip || '';
+    const channel = apState.attributes.channel || '';
+    const radioType = apState.attributes.radio || '';
+    const ssid = apState.attributes.ssid || '';
     
     // Timestamp para evitar cache da imagem
     const timestamp = new Date().getTime();
     
-    // Carrega os estilos de ícones
-    const iconStylesheet = document.createElement('link');
-    iconStylesheet.setAttribute('rel', 'stylesheet');
-    iconStylesheet.setAttribute('href', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+    // Material Icons para o Home Assistant que já estão disponíveis
+    // Não precisamos carregar uma biblioteca externa de ícones
     
     // Cria o template do card
     const cardHTML = `
       <style>
         :host {
-          --primary-color: var(--card-primary-color, #4b7bec);
-          --text-color: var(--card-text-color, #32325d);
-          --secondary-text-color: var(--card-secondary-text-color, #6b7c93);
-          --background-color: var(--card-background-color, #ffffff);
-          --secondary-background-color: var(--card-secondary-background-color, #f8f9fc);
-          --border-color: var(--card-border-color, #f0f2f5);
+          --primary-color: var(--card-primary-color, var(--primary-color));
+          --text-color: var(--card-text-color, var(--primary-text-color));
+          --secondary-text-color: var(--card-secondary-text-color, var(--secondary-text-color));
+          --background-color: var(--card-background-color, var(--card-background-color, var(--ha-card-background)));
+          --secondary-background-color: var(--card-secondary-background-color, var(--secondary-background-color));
+          --border-color: var(--card-border-color, var(--divider-color));
           --shadow-color: var(--card-shadow-color, rgba(0,0,0,0.08));
-          --border-radius: var(--card-border-radius, 12px);
+          --border-radius: var(--card-border-radius, var(--ha-card-border-radius, 12px));
         }
         
         ha-card {
@@ -185,6 +215,8 @@ class CameraCard extends HTMLElement {
           margin-right: 10px;
           color: var(--primary-color);
           font-size: 18px;
+          display: flex;
+          align-items: center;
         }
         
         .status-indicator {
@@ -414,13 +446,13 @@ class CameraCard extends HTMLElement {
       <ha-card>
         <div class="card-header">
           <div class="header-left">
-            <i class="fas fa-video header-icon"></i>
+            <span class="header-icon"><ha-icon icon="mdi:video"></ha-icon></span>
             ${cardTitle}
             <span class="status-indicator ${isPowerOn ? 'status-online' : 'status-offline'}"></span>
           </div>
           <div class="tooltip">
-            <i class="fas fa-circle-info" style="color: var(--primary-color); cursor: pointer;"></i>
-            <span class="tooltiptext">Camera ID: ${cameraEntity}</span>
+            <ha-icon icon="mdi:information-outline" style="color: var(--primary-color); cursor: pointer;"></ha-icon>
+            <span class="tooltiptext">IP: ${ipAddress}<br>MAC: ${macAddress}</span>
           </div>
         </div>
         
@@ -431,16 +463,17 @@ class CameraCard extends HTMLElement {
               src="${isPowerOn ? `/api/camera_proxy/${cameraEntity}?${timestamp}` : '#'}" 
               style="${!isPowerOn ? 'filter: grayscale(1) brightness(0.7);' : ''}"
               alt="Camera Feed"
+              onerror="this.src='/local/camera-card/camera-offline.png'; this.onerror=null;"
             >
             ${!isPowerOn ? '<div class="camera-offline">Câmera desligada</div>' : ''}
             ${isPowerOn ? `
             <div class="camera-controls-overlay">
               <button class="camera-control-btn tooltip" id="fullscreen-btn">
-                <i class="fas fa-expand"></i>
+                <ha-icon icon="mdi:fullscreen"></ha-icon>
                 <span class="tooltiptext">Tela cheia</span>
               </button>
               <button class="camera-control-btn tooltip" id="snapshot-btn">
-                <i class="fas fa-camera"></i>
+                <ha-icon icon="mdi:camera"></ha-icon>
                 <span class="tooltiptext">Capturar</span>
               </button>
             </div>
@@ -449,15 +482,15 @@ class CameraCard extends HTMLElement {
           
           <div class="info-section">
             <div class="info-title">
-              <i class="fas fa-chart-line"></i> Métricas de Desempenho
+              <ha-icon icon="mdi:chart-line"></ha-icon> Métricas de Desempenho
             </div>
             <div class="info-row">
-              <span class="info-label"><i class="fas fa-gauge-high"></i> FPS:</span>
+              <span class="info-label"><ha-icon icon="mdi:speedometer"></ha-icon> FPS:</span>
               <span class="info-value">${fps}</span>
             </div>
             
             <div class="info-row">
-              <span class="info-label"><i class="fas fa-microchip"></i> CPU:</span>
+              <span class="info-label"><ha-icon icon="mdi:cpu-64-bit"></ha-icon> CPU:</span>
               <div class="info-value" style="display: flex; align-items: center;">
                 ${cpu}%
                 <div class="cpu-bar">
@@ -466,11 +499,45 @@ class CameraCard extends HTMLElement {
               </div>
             </div>
           </div>
+
+          <div class="info-section">
+            <div class="info-title">
+              <ha-icon icon="mdi:wifi"></ha-icon> Informações de Conexão
+            </div>
+            <div class="info-row">
+              <span class="info-label"><ha-icon icon="mdi:access-point"></ha-icon> Ponto de Acesso:</span>
+              <span class="info-value" title="MAC: ${apMac}">${apName}</span>
+            </div>
+            
+            ${rssiValue !== null ? `
+            <div class="info-row">
+              <span class="info-label"><ha-icon icon="mdi:signal"></ha-icon> RSSI:</span>
+              <div class="info-value" style="display: flex; align-items: center;">
+                ${rssiValue} dBm (${Math.round(rssiPercent)}%)
+                <div class="cpu-bar" style="margin-left: 5px;">
+                  <div class="cpu-fill" style="width: ${rssiPercent}%; background-color: ${rssiPercent > 70 ? '#2ecc71' : rssiPercent > 40 ? '#f39c12' : '#e74c3c'};"></div>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+            
+            ${snrValue !== null ? `
+            <div class="info-row">
+              <span class="info-label"><ha-icon icon="mdi:signal-variant"></ha-icon> SNR:</span>
+              <span class="info-value">${snrValue} dB</span>
+            </div>
+            ` : ''}
+            
+            <div class="info-row">
+              <span class="info-label"><ha-icon icon="mdi:wifi-settings"></ha-icon> Rede:</span>
+              <span class="info-value" title="Canal: ${channel}, ${radioType}">${ssid}</span>
+            </div>
+          </div>
           
           <div class="controls-section">
             <div class="controls-row">
               <button class="reconnect-button" id="reconnect-btn">
-                <i class="fas fa-rotate"></i>
+                <ha-icon icon="mdi:refresh"></ha-icon>
                 Reconectar
               </button>
               
@@ -490,7 +557,6 @@ class CameraCard extends HTMLElement {
     // Atualiza o shadow DOM
     if (!this.shadowRoot.querySelector('ha-card')) {
       this.shadowRoot.innerHTML = '';
-      this.shadowRoot.appendChild(iconStylesheet);
       const root = document.createElement('div');
       root.innerHTML = cardHTML;
       this.shadowRoot.appendChild(root);
