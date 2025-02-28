@@ -1,20 +1,14 @@
-// Função para capturar uma imagem
-  _captureSnapshot() {
-    this._hass.callService('camera', 'snapshot', {
-      entity_id: this.config.camera_entity,
-      filename: `/config/www/camera_snapshots/${this.config.camera_entity.split('.')[1]}_${new Date().toISOString().replace(/:/g, '-')}.jpg`
-    });
-  }/**
+/**
  * Camera Card para Home Assistant
  * 
  * Este componente mostra:
- * - Imagem da câmera
  * - FPS da câmera
  * - Uso de CPU
+ * - Informações de conexão
  * - Botão para reconectar a câmera
  * - Switch para ligar/desligar a alimentação da câmera
  * 
- * Versão: 1.1.0
+ * Versão: 1.2.0
  * Tema: Claro
  */
 
@@ -54,11 +48,6 @@ class CameraCard extends HTMLElement {
       throw new Error('Você precisa definir pelo menos um sensor de sinal (rssi_sensor ou snr_sensor)');
     }
     
-    // A URL RTSP agora é obrigatória em vez da entidade de câmera
-    if (!config.rtsp_url) {
-      throw new Error('Você precisa definir a URL RTSP da câmera (rtsp_url)');
-    }
-    
     this.config = config;
     this.render();
   }
@@ -89,14 +78,6 @@ class CameraCard extends HTMLElement {
     });
   }
 
-  // Função para abrir a câmera em tela cheia
-  _openFullscreen() {
-    this._hass.callService('camera', 'play_stream', {
-      entity_id: this.config.camera_entity,
-      format: 'hls'
-    });
-  }
-
   // Método para obter o estilo de fundo baseado no FPS
   _getBackgroundStyle(fps) {
     // Converte o valor para número
@@ -124,7 +105,6 @@ class CameraCard extends HTMLElement {
     const apEntity = this.config.ap_entity;
     const rssiSensor = this.config.rssi_sensor;
     const snrSensor = this.config.snr_sensor;
-    const rtspUrl = this.config.rtsp_url;
     
     // Obtém estados das entidades
     const fpsState = this._hass.states[fpsSensor];
@@ -176,9 +156,6 @@ class CameraCard extends HTMLElement {
     const radioType = apState.attributes.radio || '';
     const ssid = apState.attributes.ssid || '';
     
-    // Timestamp para evitar cache da imagem
-    const timestamp = new Date().getTime();
-    
     // Material Icons para o Home Assistant que já estão disponíveis
     // Não precisamos carregar uma biblioteca externa de ícones
     
@@ -204,18 +181,6 @@ class CameraCard extends HTMLElement {
           overflow: hidden;
           transition: transform 0.2s, box-shadow 0.2s;
           ${backgroundStyle}
-        }
-        
-        .camera-video {
-          width: 100%;
-          border-radius: 8px;
-          display: block;
-        }
-        
-        .camera-offline-container {
-          width: 100%;
-          text-align: center;
-          color: #666;
         }
         
         ha-card:hover {
@@ -266,63 +231,6 @@ class CameraCard extends HTMLElement {
         
         .card-content {
           padding: 20px 24px;
-        }
-        
-        .camera-container {
-          position: relative;
-          width: 100%;
-          margin-bottom: 20px;
-          border-radius: 8px;
-          overflow: hidden;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-        
-        .camera-image {
-          width: 100%;
-          display: block;
-          transition: filter 0.3s;
-        }
-        
-        .camera-offline {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background-color: rgba(0, 0, 0, 0.7);
-          color: white;
-          padding: 8px 16px;
-          border-radius: 4px;
-          font-weight: 500;
-        }
-        
-        .camera-controls-overlay {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          background-color: rgba(255,255,255,0.8);
-          border-radius: 20px;
-          padding: 5px 10px;
-          display: flex;
-          gap: 8px;
-        }
-        
-        .camera-control-btn {
-          background: none;
-          border: none;
-          color: var(--primary-color);
-          cursor: pointer;
-          font-size: 16px;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background-color 0.2s;
-        }
-        
-        .camera-control-btn:hover {
-          background-color: rgba(75, 123, 236, 0.1);
         }
         
         .info-section {
@@ -486,70 +394,6 @@ class CameraCard extends HTMLElement {
         </div>
         
         <div class="card-content">
-          <div class="camera-container">
-            ${isPowerOn ? `
-            <video 
-              class="camera-video" 
-              autoplay 
-              muted 
-              playsinline
-              style="width: 100%; height: auto; display: block;"
-              id="rtsp-video"
-              poster="/api/resources/static/images/placeholder.png"
-            ></video>
-            <script>
-              // Função para inicializar o player de vídeo
-              (function initVideo() {
-                const videoElement = document.getElementById('rtsp-video');
-                if (videoElement && window.Hls && window.Hls.isSupported()) {
-                  const hls = new window.Hls();
-                  // URL convertida RTSP -> HLS via servidor ou proxy
-                  hls.loadSource("${this.config.rtsp_url.replace('rtsp://', 'http://').replace(':554', ':8888')}/index.m3u8");
-                  hls.attachMedia(videoElement);
-                  hls.on(window.Hls.Events.MANIFEST_PARSED, function() {
-                    videoElement.play().catch(e => {
-                      console.warn('Autoplay failed:', e);
-                    });
-                  });
-                } else if (videoElement && videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-                  // Safari suporta HLS nativamente
-                  videoElement.src = "${this.config.rtsp_url.replace('rtsp://', 'http://').replace(':554', ':8888')}/index.m3u8";
-                  videoElement.addEventListener('loadedmetadata', function() {
-                    videoElement.play().catch(e => {
-                      console.warn('Autoplay failed:', e);
-                    });
-                  });
-                } else {
-                  // Fallback para um iframe ou mensagem de erro
-                  const container = videoElement.parentNode;
-                  container.innerHTML = 
-                    '<div style="padding: 20px; text-align: center; background-color: #f0f0f0; height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px;">' +
-                    '<ha-icon icon="mdi:video-off" style="font-size: 48px; color: #999; margin-bottom: 16px;"></ha-icon>' +
-                    '<div>Este navegador não suporta a reprodução de vídeo RTSP. Considere usar um conversor RTSP para HLS.</div>' +
-                    '</div>';
-                }
-              })();
-            </script>
-            ` : `
-            <div class="camera-offline-container" style="height: 240px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #f0f0f0; border-radius: 8px;">
-              <ha-icon icon="mdi:video-off" style="font-size: 48px; color: #999; margin-bottom: 16px;"></ha-icon>
-              <div class="camera-offline">Câmera desligada</div>
-            </div>
-            `}
-            ${isPowerOn ? `
-            <div class="camera-controls-overlay">
-              <button class="camera-control-btn tooltip" id="fullscreen-btn">
-                <ha-icon icon="mdi:fullscreen"></ha-icon>
-                <span class="tooltiptext">Tela cheia</span>
-              </button>
-              <button class="camera-control-btn tooltip" id="snapshot-btn">
-                <ha-icon icon="mdi:camera"></ha-icon>
-                <span class="tooltiptext">Capturar</span>
-              </button>
-            </div>
-            ` : ''}
-          </div>
-          
           <div class="info-section">
             <div class="info-title">
               <ha-icon icon="mdi:chart-line"></ha-icon> Métricas de Desempenho
@@ -634,16 +478,6 @@ class CameraCard extends HTMLElement {
       // Adiciona event listeners
       this.shadowRoot.querySelector('#reconnect-btn').addEventListener('click', () => this._reconnectCamera());
       this.shadowRoot.querySelector('#power-switch').addEventListener('change', () => this._togglePower());
-      
-      const fullscreenBtn = this.shadowRoot.querySelector('#fullscreen-btn');
-      if (fullscreenBtn) {
-        fullscreenBtn.addEventListener('click', () => this._openFullscreen());
-      }
-      
-      const snapshotBtn = this.shadowRoot.querySelector('#snapshot-btn');
-      if (snapshotBtn) {
-        snapshotBtn.addEventListener('click', () => this._captureSnapshot());
-      }
     } else {
       const root = this.shadowRoot.querySelector('div');
       root.innerHTML = cardHTML;
@@ -651,22 +485,12 @@ class CameraCard extends HTMLElement {
       // Adiciona event listeners
       this.shadowRoot.querySelector('#reconnect-btn').addEventListener('click', () => this._reconnectCamera());
       this.shadowRoot.querySelector('#power-switch').addEventListener('change', () => this._togglePower());
-      
-      const fullscreenBtn = this.shadowRoot.querySelector('#fullscreen-btn');
-      if (fullscreenBtn) {
-        fullscreenBtn.addEventListener('click', () => this._openFullscreen());
-      }
-      
-      const snapshotBtn = this.shadowRoot.querySelector('#snapshot-btn');
-      if (snapshotBtn) {
-        snapshotBtn.addEventListener('click', () => this._captureSnapshot());
-      }
     }
   }
 
   // Obtém o tamanho do card
   getCardSize() {
-    return 4;
+    return 3;
   }
 }
 
