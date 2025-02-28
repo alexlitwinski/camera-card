@@ -105,6 +105,7 @@ class CameraCard extends HTMLElement {
     }
     
     const fpsSensor = this.config.fps_sensor;
+    const processFpsSensor = this.config.process_fps_sensor;
     const cpuSensor = this.config.cpu_sensor;
     const powerSwitch = this.config.power_switch;
     const apEntity = this.config.ap_entity;
@@ -113,11 +114,12 @@ class CameraCard extends HTMLElement {
     
     // Obtém estados das entidades
     const fpsState = this._hass.states[fpsSensor];
+    const processFpsState = this._hass.states[processFpsSensor];
     const cpuState = this._hass.states[cpuSensor];
     const switchState = this._hass.states[powerSwitch];
     const apState = this._hass.states[apEntity];
     
-    if (!fpsState || !cpuState || !switchState || !apState) {
+    if (!fpsState || !processFpsState || !cpuState || !switchState || !apState) {
       this.shadowRoot.innerHTML = `
         <ha-card header="Camera Card - Erro">
           <div class="card-content">
@@ -137,12 +139,13 @@ class CameraCard extends HTMLElement {
     
     // Obtém valores dos sensores
     const fps = fpsState.state;
+    const processFps = processFpsState.state;
     const cpu = parseFloat(cpuState.state);
     const cpuPercent = Math.min(cpu, 100); // Para a barra de progresso
     const isPowerOn = switchState.state === 'on';
     
-    // Obtém o estilo de fundo baseado no FPS
-    const backgroundStyle = this._getBackgroundStyle(fps);
+    // Obtém o estilo de fundo baseado nos valores de FPS
+    const backgroundStyle = this._getBackgroundStyle(processFps, fps);
     
     // Informações de conexão
     const rssiValue = rssiState ? parseFloat(rssiState.state) : null;
@@ -311,19 +314,18 @@ class CameraCard extends HTMLElement {
         }
         
         .reconnect-button {
-          background-color: var(--primary-color);
-          color: white;
+          background-color: #1a4b8c !important; /* Azul escuro fixo com !important para forçar */
+          color: white !important; /* Texto branco com !important para forçar */
           border: none;
           border-radius: 8px;
-          padding: 8px 16px; /* Reduzido o padding */
+          padding: 8px 16px;
           cursor: pointer;
           font-size: 14px;
           font-weight: 500;
           display: flex;
           align-items: center;
           gap: 8px;
-          /* Removido transition para evitar piscadas */
-          box-shadow: 0 4px 6px rgba(75, 123, 236, 0.2);
+          box-shadow: 0 4px 6px rgba(26, 75, 140, 0.2);
         }
         
         /* Removido hover e active states para evitar piscadas */
@@ -366,6 +368,11 @@ class CameraCard extends HTMLElement {
             <div class="info-row">
               <span class="info-label"><ha-icon icon="mdi:speedometer"></ha-icon> FPS:</span>
               <span class="info-value">${fps}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="info-label"><ha-icon icon="mdi:speedometer-medium"></ha-icon> Process FPS:</span>
+              <span class="info-value">${processFps}</span>
             </div>
             
             <div class="info-row">
