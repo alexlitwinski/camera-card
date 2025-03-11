@@ -63,14 +63,44 @@ class CameraCard extends HTMLElement {
   }
 
   // Função para reconectar a câmera
-  _reconnectCamera() {
-    const apState = this._hass.states[this.config.ap_entity];
-    const macAddress = apState.attributes.mac || '';
-    
-    this._hass.callService('tplink_omada', 'reconnect_client', {
-      mac: macAddress
-    });
+_reconnectCamera() {
+  if (!this._hass || !this.config || !this.config.ap_entity) {
+    console.error('Dados necessários não disponíveis para reconectar a câmera');
+    return;
   }
+  
+  const apState = this._hass.states[this.config.ap_entity];
+  
+  if (!apState || !apState.attributes) {
+    console.error('Estado da entidade AP não disponível');
+    return;
+  }
+  
+  // Certifique-se de usar o atributo correto que contém o MAC address da câmera
+  // O atributo 'mac' deve conter o endereço MAC do cliente (câmera)
+  const macAddress = apState.attributes.mac || '';
+  
+  if (!macAddress) {
+    console.error('MAC address da câmera não encontrado');
+    return;
+  }
+  
+  console.log('Tentando reconectar câmera com MAC:', macAddress);
+  
+  // Chama o serviço tplink_omada.reconnect_client com o MAC da câmera
+  this._hass.callService('tplink_omada', 'reconnect_client', {
+    mac: macAddress
+  }).then(() => {
+    // Opcional: Adicione uma notificação de sucesso
+    this._hass.callService('persistent_notification', 'create', {
+      title: 'Câmera',
+      message: `Comando de reconexão enviado para a câmera (MAC: ${macAddress})`
+    });
+    console.log('Comando de reconexão enviado com sucesso');
+  }).catch(error => {
+    console.error('Erro ao reconectar câmera:', error);
+  });
+}
 
   // Função para alternar a alimentação da câmera
   _togglePower() {
