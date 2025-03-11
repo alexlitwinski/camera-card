@@ -483,27 +483,14 @@ class CameraCard extends HTMLElement {
       value.id = `${row.id}-value`;
       
       if (row.hasCpuBar) {
+        // Usamos a mesma abordagem do RSSI para a barra de CPU
         value.style.display = 'flex';
         value.style.alignItems = 'center';
-        // Cria os elementos de texto e barra separadamente para facilitar a atualização
-        const textElement = document.createTextNode('0% ');
-        value.appendChild(textElement);
-        
-        const barContainer = document.createElement('div');
-        barContainer.className = 'cpu-bar';
-        barContainer.style.marginLeft = '5px';
-        
-        const barFill = document.createElement('div');
-        barFill.className = 'cpu-fill';
-        barFill.id = 'cpu-fill';
-        barFill.style.width = '0%';
-        
-        barContainer.appendChild(barFill);
-        value.appendChild(barContainer);
+        value.innerHTML = `0% (0%) <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: 0%; background-color: #3498db;"></div></div>`;
       } else if (row.hasRssiBar) {
         value.style.display = 'flex';
         value.style.alignItems = 'center';
-        value.innerHTML = `0 dBm (0%) <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" id="rssi-bar" style="width: 0%"></div></div>`;
+        value.innerHTML = `0 dBm (0%) <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: 0%"></div></div>`;
       }
       
       rowElement.appendChild(value);
@@ -513,37 +500,7 @@ class CameraCard extends HTMLElement {
     return section;
   }
 
-  _updateValues() {
-    if (!this._hass || !this.config || !this._cache.elements) return;
-    
-    const elements = this._cache.elements;
-    
-    // Verifica se todos os elementos necessários estão presentes
-    if (!elements.card || !elements.cardHeader) return;
-    
-    // Obtém estados das entidades
-    const fpsState = this._hass.states[this.config.fps_sensor];
-    const processFpsState = this._hass.states[this.config.process_fps_sensor];
-    const cpuState = this._hass.states[this.config.cpu_sensor];
-    const switchState = this._hass.states[this.config.power_switch];
-    
-    if (!fpsState || !processFpsState || !cpuState || !switchState) {
-      console.warn('Camera Card: Uma ou mais entidades não foram encontradas');
-      return;
-    }
-    
-    // Entidades opcionais
-    const apState = this.config.ap_entity ? this._hass.states[this.config.ap_entity] : null;
-    const rssiState = this.config.rssi_sensor ? this._hass.states[this.config.rssi_sensor] : null;
-    const snrState = this.config.snr_sensor ? this._hass.states[this.config.snr_sensor] : null;
-    const hasCameraEntity = this.config.camera_entity && this._hass.states[this.config.camera_entity];
-    
-    // Título do card
-    const cardTitle = this.config.title || 'Camera Card';
-    
-    // Obtém valores dos sensores
-    const fps = fpsState.state;
-    const processFps = processFpsState.state;
+;
     const cpu = parseFloat(cpuState.state);
     
     // Normaliza o percentual de CPU para um máximo de 5%
@@ -759,4 +716,4 @@ window.customCards.push({
   name: 'Camera Card',
   description: 'Card de câmera com informações de desempenho e controles - Versão Otimizada',
   preview: true
-});v
+});
