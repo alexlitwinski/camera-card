@@ -485,7 +485,21 @@ class CameraCard extends HTMLElement {
       if (row.hasCpuBar) {
         value.style.display = 'flex';
         value.style.alignItems = 'center';
-        value.innerHTML = `0% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" id="cpu-fill" style="width: 0%"></div></div>`;
+        // Cria os elementos de texto e barra separadamente para facilitar a atualização
+        const textElement = document.createTextNode('0% ');
+        value.appendChild(textElement);
+        
+        const barContainer = document.createElement('div');
+        barContainer.className = 'cpu-bar';
+        barContainer.style.marginLeft = '5px';
+        
+        const barFill = document.createElement('div');
+        barFill.className = 'cpu-fill';
+        barFill.id = 'cpu-fill';
+        barFill.style.width = '0%';
+        
+        barContainer.appendChild(barFill);
+        value.appendChild(barContainer);
       } else if (row.hasRssiBar) {
         value.style.display = 'flex';
         value.style.alignItems = 'center';
@@ -577,7 +591,16 @@ class CameraCard extends HTMLElement {
     if (elements.processFps) elements.processFps.textContent = processFps;
     
     if (elements.cpu) {
-      elements.cpu.innerHTML = `${cpu}% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: ${cpuPercent}%"></div></div>`;
+      // Encontre ou crie o elemento da barra de CPU
+      const cpuBar = elements.cpu.querySelector('.cpu-fill');
+      if (cpuBar) {
+        // Atualiza diretamente o elemento existente
+        cpuBar.style.width = `${cpuPercent}%`;
+        elements.cpu.firstChild.textContent = `${cpu}% `;
+      } else {
+        // Cria o HTML completo se o elemento não existir
+        elements.cpu.innerHTML = `${cpu}% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: ${cpuPercent}%"></div></div>`;
+      }
       // Adiciona tooltip para informar sobre a escala modificada
       elements.cpu.title = "Escala da barra: máximo de 5% de CPU";
     }
@@ -736,4 +759,4 @@ window.customCards.push({
   name: 'Camera Card',
   description: 'Card de câmera com informações de desempenho e controles - Versão Otimizada',
   preview: true
-});
+});v
