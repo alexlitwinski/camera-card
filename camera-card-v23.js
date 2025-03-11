@@ -486,7 +486,7 @@ class CameraCard extends HTMLElement {
         // Usamos a mesma abordagem do RSSI para a barra de CPU
         value.style.display = 'flex';
         value.style.alignItems = 'center';
-        value.innerHTML = `0% (0%) <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: 0%; background-color: #3498db;"></div></div>`;
+        value.innerHTML = `0% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: 0%; background-color: #3498db;"></div></div>`;
       } else if (row.hasRssiBar) {
         value.style.display = 'flex';
         value.style.alignItems = 'center';
@@ -500,12 +500,45 @@ class CameraCard extends HTMLElement {
     return section;
   }
 
-;
+  _updateValues() {
+    if (!this._hass || !this.config || !this._cache.elements) return;
+    
+    const elements = this._cache.elements;
+    
+    // Verifica se todos os elementos necessários estão presentes
+    if (!elements.card || !elements.cardHeader) return;
+    
+    // Obtém estados das entidades
+    const fpsState = this._hass.states[this.config.fps_sensor];
+    const processFpsState = this._hass.states[this.config.process_fps_sensor];
+    const cpuState = this._hass.states[this.config.cpu_sensor];
+    const switchState = this._hass.states[this.config.power_switch];
+    
+    if (!fpsState || !processFpsState || !cpuState || !switchState) {
+      console.warn('Camera Card: Uma ou mais entidades não foram encontradas');
+      return;
+    }
+    
+    // Entidades opcionais
+    const apState = this.config.ap_entity ? this._hass.states[this.config.ap_entity] : null;
+    const rssiState = this.config.rssi_sensor ? this._hass.states[this.config.rssi_sensor] : null;
+    const snrState = this.config.snr_sensor ? this._hass.states[this.config.snr_sensor] : null;
+    const hasCameraEntity = this.config.camera_entity && this._hass.states[this.config.camera_entity];
+    
+    // Título do card
+    const cardTitle = this.config.title || 'Camera Card';
+    
+    // Obtém valores dos sensores
+    const fps = fpsState.state;
+    const processFps = processFpsState.state;
     const cpu = parseFloat(cpuState.state);
     
     // Normaliza o percentual de CPU para um máximo de 5%
     // Para um máximo de 5%, divide por 5 e multiplica por 100 para obter o percentual da barra
     const cpuPercent = Math.min(cpu / 5 * 100, 100);
+    
+    // Define a cor da barra baseada no percentual (azul -> amarelo -> vermelho)
+    const cpuBarColor = cpuPercent < 40 ? '#3498db' : cpuPercent < 70 ? '#f39c12' : '#e74c3c';
     
     const isPowerOn = switchState.state === 'on';
     
@@ -547,18 +580,9 @@ class CameraCard extends HTMLElement {
     if (elements.fps) elements.fps.textContent = fps;
     if (elements.processFps) elements.processFps.textContent = processFps;
     
+    // Atualiza o CPU usando a mesma abordagem que usamos para o RSSI
     if (elements.cpu) {
-      // Encontre ou crie o elemento da barra de CPU
-      const cpuBar = elements.cpu.querySelector('.cpu-fill');
-      if (cpuBar) {
-        // Atualiza diretamente o elemento existente
-        cpuBar.style.width = `${cpuPercent}%`;
-        elements.cpu.firstChild.textContent = `${cpu}% `;
-      } else {
-        // Cria o HTML completo se o elemento não existir
-        elements.cpu.innerHTML = `${cpu}% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: ${cpuPercent}%"></div></div>`;
-      }
-      // Adiciona tooltip para informar sobre a escala modificada
+      elements.cpu.innerHTML = `${cpu}% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: ${cpuPercent}%; background-color: ${cpuBarColor};"></div></div>`;
       elements.cpu.title = "Escala da barra: máximo de 5% de CPU";
     }
     
