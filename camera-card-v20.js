@@ -5,11 +5,12 @@
  * - FPS da câmera
  * - Uso de CPU
  * - Informações de conexão
- * - Botão para reconectar a câmera
+ * - Botão para reconectar a câmera (somente se ap_entity estiver configurado)
  * - Switch para ligar/desligar a alimentação da câmera
  * - Suporte para abrir a imagem da câmera ao clicar no título
+ * - Indicação "Conectado via cabo" quando rssi_sensor e snr_sensor não estiverem presentes
  * 
- * Versão: 1.4.0
+ * Versão: 1.5.0
  * Tema: Claro
  */
 
@@ -51,13 +52,7 @@ class CameraCard extends HTMLElement {
       throw new Error('Você precisa definir um switch de alimentação (power_switch)');
     }
     
-    if (!config.ap_entity) {
-      throw new Error('Você precisa definir a entidade do access point (ap_entity)');
-    }
-    
-    if (config.rssi_sensor === undefined && config.snr_sensor === undefined) {
-      throw new Error('Você precisa definir pelo menos um sensor de sinal (rssi_sensor ou snr_sensor)');
-    }
+    // ap_entity, rssi_sensor e snr_sensor não são mais obrigatórios
     
     this.config = config;
     this._isInitialRender = true;
@@ -77,15 +72,19 @@ class CameraCard extends HTMLElement {
     if (!this._hass || !this.config) return false;
     if (this._isInitialRender) return true;
     
-    const entitiesChanged = this._checkEntitiesChanged([
+    const entitiesToCheck = [
       this.config.fps_sensor,
       this.config.process_fps_sensor,
       this.config.cpu_sensor,
-      this.config.power_switch,
-      this.config.ap_entity,
-      this.config.rssi_sensor,
-      this.config.snr_sensor
-    ]);
+      this.config.power_switch
+    ];
+    
+    // Adiciona entidades opcionais à lista apenas se estiverem definidas
+    if (this.config.ap_entity) entitiesToCheck.push(this.config.ap_entity);
+    if (this.config.rssi_sensor) entitiesToCheck.push(this.config.rssi_sensor);
+    if (this.config.snr_sensor) entitiesToCheck.push(this.config.snr_sensor);
+    
+    const entitiesChanged = this._checkEntitiesChanged(entitiesToCheck);
     
     return entitiesChanged;
   }
@@ -261,6 +260,24 @@ class CameraCard extends HTMLElement {
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
       }
       
+      .wired-connection {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 12px 0;
+        padding: 8px;
+        color: var(--secondary-text-color);
+        font-size: 14px;
+        background-color: var(--background-color);
+        border-radius: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      }
+      
+      .wired-connection ha-icon {
+        margin-right: 8px;
+        color: var(--primary-color);
+      }
+      
       .cpu-bar {
         height: 6px;
         width: 60px;
@@ -369,6 +386,17 @@ class CameraCard extends HTMLElement {
     );
     cardContent.appendChild(connSection);
     
+    // Verifica se precisamos mostrar a mensagem "Conectado via cabo"
+    const hasWirelessInfo = this.config.rssi_sensor || this.config.snr_sensor;
+    
+    if (!hasWirelessInfo) {
+      // Não temos informações wireless, mostrar mensagem de conexão com cabo
+      const wiredConnection = document.createElement('div');
+      wiredConnection.className = 'wired-connection';
+      wiredConnection.innerHTML = '<ha-icon icon="mdi:ethernet"></ha-icon> Conectado via cabo';
+      connSection.appendChild(wiredConnection);
+    }
+    
     // Controles
     const controlsSection = document.createElement('div');
     controlsSection.className = 'controls-section';
@@ -376,13 +404,15 @@ class CameraCard extends HTMLElement {
     const controlsRow = document.createElement('div');
     controlsRow.className = 'controls-row';
     
-    // Botão reconnect
-    const reconnectBtn = document.createElement('button');
-    reconnectBtn.className = 'reconnect-button';
-    reconnectBtn.id = 'reconnect-btn';
-    reconnectBtn.innerHTML = '<ha-icon icon="mdi:refresh"></ha-icon> Reconectar';
-    reconnectBtn.addEventListener('click', () => this._reconnectCamera());
-    controlsRow.appendChild(reconnectBtn);
+    // Botão reconnect - apenas se ap_entity estiver configurado
+    if (this.config.ap_entity) {
+      const reconnectBtn = document.createElement('button');
+      reconnectBtn.className = 'reconnect-button';
+      reconnectBtn.id = 'reconnect-btn';
+      reconnectBtn.innerHTML = '<ha-icon icon="mdi:refresh"></ha-icon> Reconectar';
+      reconnectBtn.addEventListener('click', () => this._reconnectCamera());
+      controlsRow.appendChild(reconnectBtn);
+    }
     
     // Switch de alimentação
     const switchContainer = document.createElement('div');
@@ -399,24 +429,26 @@ class CameraCard extends HTMLElement {
     switchContainer.appendChild(powerSwitch);
     
     controlsRow.appendChild(switchContainer);
-    controlsSection.appendChild(controlsRow);
-    cardContent.appendChild(controlsSection);
+    
+    // Só adiciona a seção de controles se tivermos elementos para mostrar
+    if (controlsRow.children.length > 0) {
+      controlsSection.appendChild(controlsRow);
+      cardContent.appendChild(controlsSection);
+    }
     
     // Armazena referências aos elementos para atualização
     this._cache.elements = {
       card,
       cardHeader,
-      reconnectBtn,
+      reconnectBtn: this.config.ap_entity ? this.shadowRoot.getElementById('reconnect-btn') : null,
       powerSwitch,
       fps: this.shadowRoot.getElementById('fps-value'),
       processFps: this.shadowRoot.getElementById('process-fps-value'),
       cpu: this.shadowRoot.getElementById('cpu-value'),
-      cpuFill: this.shadowRoot.getElementById('cpu-fill'),
-      ap: this.shadowRoot.getElementById('ap-value'),
-      rssi: this.shadowRoot.getElementById('rssi-value'),
-      rssiBar: this.shadowRoot.getElementById('rssi-bar'),
-      snr: this.shadowRoot.getElementById('snr-value'),
-      network: this.shadowRoot.getElementById('network-value')
+      ap: this.config.ap_entity ? this.shadowRoot.getElementById('ap-value') : null,
+      rssi: this.config.rssi_sensor ? this.shadowRoot.getElementById('rssi-value') : null,
+      snr: this.config.snr_sensor ? this.shadowRoot.getElementById('snr-value') : null,
+      network: this.config.ap_entity ? this.shadowRoot.getElementById('network-value') : null
     };
     
     // Atualiza os valores iniciais
@@ -433,10 +465,10 @@ class CameraCard extends HTMLElement {
     section.appendChild(titleElement);
     
     rows.forEach(row => {
-      if ((row.id === 'rssi' && !this.config.rssi_sensor) || 
-          (row.id === 'snr' && !this.config.snr_sensor)) {
-        return; // Não cria a linha se o sensor não foi configurado
-      }
+      // Pula criação da linha se a configuração relacionada não existir
+      if ((row.id === 'ap' || row.id === 'network') && !this.config.ap_entity) return;
+      if (row.id === 'rssi' && !this.config.rssi_sensor) return;
+      if (row.id === 'snr' && !this.config.snr_sensor) return;
       
       const rowElement = document.createElement('div');
       rowElement.className = 'info-row';
@@ -480,13 +512,14 @@ class CameraCard extends HTMLElement {
     const processFpsState = this._hass.states[this.config.process_fps_sensor];
     const cpuState = this._hass.states[this.config.cpu_sensor];
     const switchState = this._hass.states[this.config.power_switch];
-    const apState = this._hass.states[this.config.ap_entity];
     
-    if (!fpsState || !processFpsState || !cpuState || !switchState || !apState) {
+    if (!fpsState || !processFpsState || !cpuState || !switchState) {
       console.warn('Camera Card: Uma ou mais entidades não foram encontradas');
       return;
     }
     
+    // Entidades opcionais
+    const apState = this.config.ap_entity ? this._hass.states[this.config.ap_entity] : null;
     const rssiState = this.config.rssi_sensor ? this._hass.states[this.config.rssi_sensor] : null;
     const snrState = this.config.snr_sensor ? this._hass.states[this.config.snr_sensor] : null;
     const hasCameraEntity = this.config.camera_entity && this._hass.states[this.config.camera_entity];
@@ -498,8 +531,11 @@ class CameraCard extends HTMLElement {
     const fps = fpsState.state;
     const processFps = processFpsState.state;
     const cpu = parseFloat(cpuState.state);
+    
     // Normaliza o percentual de CPU para um máximo de 5%
-    const cpuPercent = Math.min(cpu, 5) * 20; // Multiplica por 20 para que 5% represente 100% da barra
+    // Para um máximo de 5%, divide por 5 e multiplica por 100 para obter o percentual da barra
+    const cpuPercent = Math.min(cpu / 5 * 100, 100);
+    
     const isPowerOn = switchState.state === 'on';
     
     // Define o estilo de fundo baseado nos valores de FPS
@@ -546,12 +582,22 @@ class CameraCard extends HTMLElement {
       elements.cpu.title = "Escala da barra: máximo de 5% de CPU";
     }
     
-    // Informações de conexão
-    const apName = apState.attributes.ap_name || 'Desconhecido';
-    const apMac = apState.attributes.ap_mac || '';
-    if (elements.ap) {
+    // Informações de conexão se disponíveis
+    if (apState && elements.ap) {
+      const apName = apState.attributes.ap_name || 'Desconhecido';
+      const apMac = apState.attributes.ap_mac || '';
       elements.ap.textContent = apName;
       elements.ap.title = `MAC: ${apMac}`;
+      
+      // Informações de rede
+      if (elements.network) {
+        const ssid = apState.attributes.ssid || '';
+        const channel = apState.attributes.channel || '';
+        const radioType = apState.attributes.radio || '';
+        
+        elements.network.textContent = ssid;
+        elements.network.title = `Canal: ${channel}, ${radioType}`;
+      }
     }
     
     // RSSI
@@ -565,16 +611,6 @@ class CameraCard extends HTMLElement {
     // SNR
     if (snrState && elements.snr) {
       elements.snr.textContent = `${snrState.state} dB`;
-    }
-    
-    // Informações de rede
-    const ssid = apState.attributes.ssid || '';
-    const channel = apState.attributes.channel || '';
-    const radioType = apState.attributes.radio || '';
-    
-    if (elements.network) {
-      elements.network.textContent = ssid;
-      elements.network.title = `Canal: ${channel}, ${radioType}`;
     }
     
     // Switch de alimentação
