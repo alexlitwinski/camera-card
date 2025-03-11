@@ -19,26 +19,7 @@ class CameraCard extends HTMLElement {
     return {
       hass: Object,
       config: Object,
-    }
-  }
-
-  // Obtém o tamanho do card
-  getCardSize() {
-    return 3;
-  }
-}
-
-// Registra o card personalizado
-customElements.define('camera-card', CameraCard);
-
-// Informações para o HACS
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'camera-card',
-  name: 'Camera Card',
-  description: 'Card de câmera com informações de desempenho e controles',
-  preview: true
-});;
+    };
   }
 
   constructor() {
@@ -640,6 +621,14 @@ window.customCards.push({
         this.shadowRoot.querySelector('#card-header').addEventListener('click', () => this._openCameraView());
       }
     }
+  }
+
+  // Obtém o tamanho do card
+  getCardSize() {
+    return 3;
+  }
+}
+
 // Registra o card personalizado
 customElements.define('camera-card', CameraCard);
 
