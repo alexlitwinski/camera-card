@@ -7,8 +7,9 @@
  * - Informações de conexão
  * - Botão para reconectar a câmera
  * - Switch para ligar/desligar a alimentação da câmera
+ * - Suporte para abrir a imagem da câmera ao clicar no título
  * 
- * Versão: 1.2.1
+ * Versão: 1.3.0
  * Tema: Claro
  */
 
@@ -18,7 +19,26 @@ class CameraCard extends HTMLElement {
     return {
       hass: Object,
       config: Object,
-    };
+    }
+  }
+
+  // Obtém o tamanho do card
+  getCardSize() {
+    return 3;
+  }
+}
+
+// Registra o card personalizado
+customElements.define('camera-card', CameraCard);
+
+// Informações para o HACS
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: 'camera-card',
+  name: 'Camera Card',
+  description: 'Card de câmera com informações de desempenho e controles',
+  preview: true
+});;
   }
 
   constructor() {
@@ -52,6 +72,8 @@ class CameraCard extends HTMLElement {
       throw new Error('Você precisa definir pelo menos um sensor de sinal (rssi_sensor ou snr_sensor)');
     }
     
+    // camera_entity é opcional
+    
     this.config = config;
     this.render();
   }
@@ -62,109 +84,137 @@ class CameraCard extends HTMLElement {
     this.render();
   }
 
+  // Função para abrir a visualização da câmera
+  _openCameraView() {
+    if (!this._hass || !this.config || !this.config.camera_entity) {
+      console.log('Entidade da câmera não configurada');
+      return;
+    }
+    
+    // Verifica se a entidade da câmera existe
+    const cameraEntity = this.config.camera_entity;
+    if (!this._hass.states[cameraEntity]) {
+      console.error(`Entidade da câmera não encontrada: ${cameraEntity}`);
+      return;
+    }
+    
+    // Dispara o evento para abrir a visualização mais-info da câmera
+    const event = new CustomEvent('hass-more-info', {
+      detail: {
+        entityId: cameraEntity
+      },
+      bubbles: true,
+      composed: true
+    });
+    this.dispatchEvent(event);
+    
+    console.log(`Abrindo visualização da câmera: ${cameraEntity}`);
+  }
+
   // Função para reconectar a câmera
-_reconnectCamera() {
-  if (!this._hass || !this.config || !this.config.ap_entity) {
-    console.error('Dados necessários não disponíveis para reconectar a câmera');
-    return;
-  }
-  
-  // Obter referência ao botão para adicionar feedback visual
-  const reconnectButton = this.shadowRoot.querySelector('#reconnect-btn');
-  
-  // Armazenar o texto original do botão
-  const originalButtonText = reconnectButton.innerHTML;
-  
-  // Alterar o botão para mostrar feedback visual
-  reconnectButton.innerHTML = '<ha-icon icon="mdi:loading" class="loading-icon"></ha-icon> Reconectando...';
-  reconnectButton.style.backgroundColor = '#0D3880'; // Azul mais escuro durante o processo
-  reconnectButton.disabled = true;
-  
-  // Adicionar estilo para o ícone de carregamento girando
-  const styleEl = document.createElement('style');
-  styleEl.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+  _reconnectCamera() {
+    if (!this._hass || !this.config || !this.config.ap_entity) {
+      console.error('Dados necessários não disponíveis para reconectar a câmera');
+      return;
     }
-    .loading-icon {
-      animation: spin 1s linear infinite;
-    }
-  `;
-  this.shadowRoot.appendChild(styleEl);
-  
-  const apState = this._hass.states[this.config.ap_entity];
-  
-  if (!apState || !apState.attributes) {
-    console.error('Estado da entidade AP não disponível');
-    // Restaurar o botão
-    reconnectButton.innerHTML = originalButtonText;
-    reconnectButton.disabled = false;
-    reconnectButton.style.backgroundColor = '#1a4b8c';
-    return;
-  }
-  
-  // Obter e formatar o MAC address
-  let macAddress = apState.attributes.mac || '';
-  
-  if (!macAddress) {
-    console.error('MAC address da câmera não encontrado');
-    // Restaurar o botão
-    reconnectButton.innerHTML = originalButtonText;
-    reconnectButton.disabled = false;
-    reconnectButton.style.backgroundColor = '#1a4b8c';
-    return;
-  }
-  
-  // Converter o formato do MAC
-  const formattedMac = macAddress.replace(/:/g, '-').toUpperCase();
-  
-  console.log('MAC original:', macAddress);
-  console.log('MAC formatado:', formattedMac);
-  
-  // Chamar o serviço com o MAC formatado
-  this._hass.callService('tplink_omada', 'reconnect_client', {
-    mac: formattedMac
-  }).then(() => {
-    console.log('Comando de reconexão enviado com sucesso');
     
-    // Feedback de sucesso
-    reconnectButton.innerHTML = '<ha-icon icon="mdi:check"></ha-icon> Enviado!';
-    reconnectButton.style.backgroundColor = '#2ecc71'; // Verde para sucesso
+    // Obter referência ao botão para adicionar feedback visual
+    const reconnectButton = this.shadowRoot.querySelector('#reconnect-btn');
     
-    // Mostrar uma notificação de toast (se disponível)
-    if (this._hass.callService && typeof this._hass.callService === 'function') {
-      try {
-        this._hass.callService('persistent_notification', 'create', {
-          title: 'Camera Card',
-          message: `Comando de reconexão enviado (MAC: ${formattedMac})`
-        });
-      } catch (e) {
-        console.error('Erro ao criar notificação:', e);
+    // Armazenar o texto original do botão
+    const originalButtonText = reconnectButton.innerHTML;
+    
+    // Alterar o botão para mostrar feedback visual
+    reconnectButton.innerHTML = '<ha-icon icon="mdi:loading" class="loading-icon"></ha-icon> Reconectando...';
+    reconnectButton.style.backgroundColor = '#0D3880'; // Azul mais escuro durante o processo
+    reconnectButton.disabled = true;
+    
+    // Adicionar estilo para o ícone de carregamento girando
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
+      .loading-icon {
+        animation: spin 1s linear infinite;
+      }
+    `;
+    this.shadowRoot.appendChild(styleEl);
+    
+    const apState = this._hass.states[this.config.ap_entity];
+    
+    if (!apState || !apState.attributes) {
+      console.error('Estado da entidade AP não disponível');
+      // Restaurar o botão
+      reconnectButton.innerHTML = originalButtonText;
+      reconnectButton.disabled = false;
+      reconnectButton.style.backgroundColor = '#1a4b8c';
+      return;
     }
     
-    // Restaurar o botão após 3 segundos
-    setTimeout(() => {
+    // Obter e formatar o MAC address
+    let macAddress = apState.attributes.mac || '';
+    
+    if (!macAddress) {
+      console.error('MAC address da câmera não encontrado');
+      // Restaurar o botão
       reconnectButton.innerHTML = originalButtonText;
       reconnectButton.disabled = false;
       reconnectButton.style.backgroundColor = '#1a4b8c';
-    }, 3000);
-  }).catch(error => {
-    console.error('Erro ao reconectar câmera:', error);
+      return;
+    }
     
-    // Feedback de erro
-    reconnectButton.innerHTML = '<ha-icon icon="mdi:alert"></ha-icon> Erro!';
-    reconnectButton.style.backgroundColor = '#e74c3c'; // Vermelho para erro
+    // Converter o formato do MAC
+    const formattedMac = macAddress.replace(/:/g, '-').toUpperCase();
     
-    // Restaurar o botão após 3 segundos
-    setTimeout(() => {
-      reconnectButton.innerHTML = originalButtonText;
-      reconnectButton.disabled = false;
-      reconnectButton.style.backgroundColor = '#1a4b8c';
-    }, 3000);
-  });
-}
+    console.log('MAC original:', macAddress);
+    console.log('MAC formatado:', formattedMac);
+    
+    // Chamar o serviço com o MAC formatado
+    this._hass.callService('tplink_omada', 'reconnect_client', {
+      mac: formattedMac
+    }).then(() => {
+      console.log('Comando de reconexão enviado com sucesso');
+      
+      // Feedback de sucesso
+      reconnectButton.innerHTML = '<ha-icon icon="mdi:check"></ha-icon> Enviado!';
+      reconnectButton.style.backgroundColor = '#2ecc71'; // Verde para sucesso
+      
+      // Mostrar uma notificação de toast (se disponível)
+      if (this._hass.callService && typeof this._hass.callService === 'function') {
+        try {
+          this._hass.callService('persistent_notification', 'create', {
+            title: 'Camera Card',
+            message: `Comando de reconexão enviado (MAC: ${formattedMac})`
+          });
+        } catch (e) {
+          console.error('Erro ao criar notificação:', e);
+        }
+      }
+      
+      // Restaurar o botão após 3 segundos
+      setTimeout(() => {
+        reconnectButton.innerHTML = originalButtonText;
+        reconnectButton.disabled = false;
+        reconnectButton.style.backgroundColor = '#1a4b8c';
+      }, 3000);
+    }).catch(error => {
+      console.error('Erro ao reconectar câmera:', error);
+      
+      // Feedback de erro
+      reconnectButton.innerHTML = '<ha-icon icon="mdi:alert"></ha-icon> Erro!';
+      reconnectButton.style.backgroundColor = '#e74c3c'; // Vermelho para erro
+      
+      // Restaurar o botão após 3 segundos
+      setTimeout(() => {
+        reconnectButton.innerHTML = originalButtonText;
+        reconnectButton.disabled = false;
+        reconnectButton.style.backgroundColor = '#1a4b8c';
+      }, 3000);
+    });
+  }
+
   // Função para alternar a alimentação da câmera
   _togglePower() {
     const switchState = this._hass.states[this.config.power_switch];
@@ -204,6 +254,7 @@ _reconnectCamera() {
     const apEntity = this.config.ap_entity;
     const rssiSensor = this.config.rssi_sensor;
     const snrSensor = this.config.snr_sensor;
+    const cameraEntity = this.config.camera_entity;
     
     // Obtém estados das entidades
     const fpsState = this._hass.states[fpsSensor];
@@ -226,6 +277,7 @@ _reconnectCamera() {
     // Obtém informações adicionais
     const rssiState = rssiSensor ? this._hass.states[rssiSensor] : null;
     const snrState = snrSensor ? this._hass.states[snrSensor] : null;
+    const hasCameraEntity = cameraEntity && this._hass.states[cameraEntity];
     
     // Define título do card
     const cardTitle = this.config.title || 'Camera Card';
@@ -293,12 +345,30 @@ _reconnectCamera() {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          transition: background-color 0.2s ease;
+        }
+        
+        .card-header.clickable {
+          cursor: pointer;
+        }
+        
+        .card-header.clickable:hover {
+          background-color: var(--secondary-background-color);
+        }
+        
+        .card-header.clickable:active {
+          background-color: var(--divider-color);
         }
         
         .header-left {
           display: flex;
           align-items: center;
-          width: 100%; /* Para ocupar todo o espaço agora que removemos o ícone */
+          flex: 1;
+        }
+        
+        .header-right {
+          margin-left: 8px;
+          opacity: 0.7;
         }
         
         .header-icon {
@@ -441,16 +511,25 @@ _reconnectCamera() {
         ha-switch {
           --mdc-theme-secondary: var(--primary-color);
         }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        .loading-icon {
+          animation: spin 1s linear infinite;
+        }
       </style>
       
       <ha-card>
-        <div class="card-header">
+        <div class="card-header ${hasCameraEntity ? 'clickable' : ''}" id="card-header">
           <div class="header-left">
             <span class="header-icon"><ha-icon icon="mdi:video"></ha-icon></span>
             ${cardTitle}
             <span class="status-indicator ${isPowerOn ? 'status-online' : 'status-offline'}"></span>
           </div>
-          <!-- Removido o ícone de informações -->
+          ${hasCameraEntity ? '<div class="header-right"><ha-icon icon="mdi:chevron-right" style="color: var(--secondary-text-color);"></ha-icon></div>' : ''}
         </div>
         
         <div class="card-content">
@@ -543,6 +622,11 @@ _reconnectCamera() {
       // Adiciona event listeners
       this.shadowRoot.querySelector('#reconnect-btn').addEventListener('click', () => this._reconnectCamera());
       this.shadowRoot.querySelector('#power-switch').addEventListener('change', () => this._togglePower());
+      
+      // Adiciona event listener para o cabeçalho da câmera se a entidade da câmera estiver configurada
+      if (hasCameraEntity) {
+        this.shadowRoot.querySelector('#card-header').addEventListener('click', () => this._openCameraView());
+      }
     } else {
       const root = this.shadowRoot.querySelector('div');
       root.innerHTML = cardHTML;
@@ -550,23 +634,9 @@ _reconnectCamera() {
       // Adiciona event listeners
       this.shadowRoot.querySelector('#reconnect-btn').addEventListener('click', () => this._reconnectCamera());
       this.shadowRoot.querySelector('#power-switch').addEventListener('change', () => this._togglePower());
+      
+      // Adiciona event listener para o cabeçalho da câmera se a entidade da câmera estiver configurada
+      if (hasCameraEntity) {
+        this.shadowRoot.querySelector('#card-header').addEventListener('click', () => this._openCameraView());
+      }
     }
-  }
-
-  // Obtém o tamanho do card
-  getCardSize() {
-    return 3;
-  }
-}
-
-// Registra o card personalizado
-customElements.define('camera-card', CameraCard);
-
-// Informações para o HACS
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'camera-card',
-  name: 'Camera Card',
-  description: 'Card de câmera com informações de desempenho e controles',
-  preview: true
-});
