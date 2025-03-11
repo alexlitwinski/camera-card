@@ -69,41 +69,100 @@ _reconnectCamera() {
     return;
   }
   
+  // Obter referência ao botão para adicionar feedback visual
+  const reconnectButton = this.shadowRoot.querySelector('#reconnect-btn');
+  
+  // Armazenar o texto original do botão
+  const originalButtonText = reconnectButton.innerHTML;
+  
+  // Alterar o botão para mostrar feedback visual
+  reconnectButton.innerHTML = '<ha-icon icon="mdi:loading" class="loading-icon"></ha-icon> Reconectando...';
+  reconnectButton.style.backgroundColor = '#0D3880'; // Azul mais escuro durante o processo
+  reconnectButton.disabled = true;
+  
+  // Adicionar estilo para o ícone de carregamento girando
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-icon {
+      animation: spin 1s linear infinite;
+    }
+  `;
+  this.shadowRoot.appendChild(styleEl);
+  
   const apState = this._hass.states[this.config.ap_entity];
   
   if (!apState || !apState.attributes) {
     console.error('Estado da entidade AP não disponível');
+    // Restaurar o botão
+    reconnectButton.innerHTML = originalButtonText;
+    reconnectButton.disabled = false;
+    reconnectButton.style.backgroundColor = '#1a4b8c';
     return;
   }
   
-  // Obter o MAC da câmera do formato original (com dois pontos)
+  // Obter e formatar o MAC address
   let macAddress = apState.attributes.mac || '';
   
   if (!macAddress) {
     console.error('MAC address da câmera não encontrado');
+    // Restaurar o botão
+    reconnectButton.innerHTML = originalButtonText;
+    reconnectButton.disabled = false;
+    reconnectButton.style.backgroundColor = '#1a4b8c';
     return;
   }
   
-  // Converter o formato do MAC:
-  // 1. Substituir dois pontos por traços
-  // 2. Converter para maiúsculas
+  // Converter o formato do MAC
   const formattedMac = macAddress.replace(/:/g, '-').toUpperCase();
   
   console.log('MAC original:', macAddress);
   console.log('MAC formatado:', formattedMac);
   
-  // Chamar o serviço com o MAC formatado corretamente
+  // Chamar o serviço com o MAC formatado
   this._hass.callService('tplink_omada', 'reconnect_client', {
     mac: formattedMac
   }).then(() => {
     console.log('Comando de reconexão enviado com sucesso');
-    // Opcional: Adicionar uma notificação visual
-    this._hass.callService('persistent_notification', 'create', {
-      title: 'Câmera',
-      message: `Comando de reconexão enviado para a câmera (MAC: ${formattedMac})`
-    });
+    
+    // Feedback de sucesso
+    reconnectButton.innerHTML = '<ha-icon icon="mdi:check"></ha-icon> Enviado!';
+    reconnectButton.style.backgroundColor = '#2ecc71'; // Verde para sucesso
+    
+    // Mostrar uma notificação de toast (se disponível)
+    if (this._hass.callService && typeof this._hass.callService === 'function') {
+      try {
+        this._hass.callService('persistent_notification', 'create', {
+          title: 'Camera Card',
+          message: `Comando de reconexão enviado (MAC: ${formattedMac})`
+        });
+      } catch (e) {
+        console.error('Erro ao criar notificação:', e);
+      }
+    }
+    
+    // Restaurar o botão após 3 segundos
+    setTimeout(() => {
+      reconnectButton.innerHTML = originalButtonText;
+      reconnectButton.disabled = false;
+      reconnectButton.style.backgroundColor = '#1a4b8c';
+    }, 3000);
   }).catch(error => {
     console.error('Erro ao reconectar câmera:', error);
+    
+    // Feedback de erro
+    reconnectButton.innerHTML = '<ha-icon icon="mdi:alert"></ha-icon> Erro!';
+    reconnectButton.style.backgroundColor = '#e74c3c'; // Vermelho para erro
+    
+    // Restaurar o botão após 3 segundos
+    setTimeout(() => {
+      reconnectButton.innerHTML = originalButtonText;
+      reconnectButton.disabled = false;
+      reconnectButton.style.backgroundColor = '#1a4b8c';
+    }, 3000);
   });
 }
   // Função para alternar a alimentação da câmera
