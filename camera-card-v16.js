@@ -9,7 +9,7 @@
  * - Switch para ligar/desligar a alimentação da câmera
  * - Suporte para abrir a imagem da câmera ao clicar no título
  * 
- * Versão: 1.3.0
+ * Versão: 1.3.1
  * Tema: Claro
  */
 
@@ -310,14 +310,11 @@ class CameraCard extends HTMLElement {
           color: var(--text-color);
           box-shadow: 0 4px 15px var(--shadow-color);
           overflow: hidden;
-          /* Removido transition para evitar piscadas */
           ${backgroundStyle}
         }
         
-        /* Removido completamente o ha-card:hover para evitar piscadas */
-        
         .card-header {
-          padding: 14px 20px; /* Reduzido o padding para deixar mais compacto */
+          padding: 14px 20px;
           background-color: var(--background-color);
           color: var(--text-color);
           font-weight: 500;
@@ -326,19 +323,11 @@ class CameraCard extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          transition: background-color 0.2s ease;
         }
         
+        /* Mantém apenas o cursor */
         .card-header.clickable {
           cursor: pointer;
-        }
-        
-        .card-header.clickable:hover {
-          background-color: var(--secondary-background-color);
-        }
-        
-        .card-header.clickable:active {
-          background-color: var(--divider-color);
         }
         
         .header-left {
@@ -377,21 +366,21 @@ class CameraCard extends HTMLElement {
         }
         
         .card-content {
-          padding: 16px 20px; /* Reduzido o padding para deixar mais compacto */
+          padding: 16px 20px;
         }
         
         .info-section {
           background-color: var(--secondary-background-color);
           border-radius: 10px;
-          padding: 12px; /* Reduzido o padding */
-          margin-bottom: 15px; /* Reduzido o margin */
+          padding: 12px;
+          margin-bottom: 15px;
         }
         
         .info-title {
           font-size: 14px;
           font-weight: 500;
           color: var(--secondary-text-color);
-          margin-bottom: 8px; /* Reduzido o margin */
+          margin-bottom: 8px;
           display: flex;
           align-items: center;
         }
@@ -404,7 +393,7 @@ class CameraCard extends HTMLElement {
         .info-row {
           display: flex;
           justify-content: space-between;
-          margin: 8px 0; /* Reduzido o margin */
+          margin: 8px 0;
           color: var(--text-color);
           font-size: 14px;
           align-items: center;
@@ -448,7 +437,7 @@ class CameraCard extends HTMLElement {
         }
         
         .controls-section {
-          margin-top: 15px; /* Reduzido o margin */
+          margin-top: 15px;
         }
         
         .controls-row {
@@ -458,8 +447,8 @@ class CameraCard extends HTMLElement {
         }
         
         .reconnect-button {
-          background-color: #1a4b8c !important; /* Azul escuro fixo com !important para forçar */
-          color: white !important; /* Texto branco com !important para forçar */
+          background-color: #1a4b8c !important;
+          color: white !important;
           border: none;
           border-radius: 8px;
           padding: 8px 16px;
@@ -472,8 +461,6 @@ class CameraCard extends HTMLElement {
           box-shadow: 0 4px 6px rgba(26, 75, 140, 0.2);
         }
         
-        /* Removido hover e active states para evitar piscadas */
-        
         .switch-container {
           display: flex;
           align-items: center;
@@ -485,8 +472,6 @@ class CameraCard extends HTMLElement {
           font-size: 14px;
           font-weight: 500;
         }
-        
-        /* Removido o tooltip que causava tremulação */
         
         /* Hack para ajustar a aparência do switch */
         ha-switch {
