@@ -498,7 +498,8 @@ class CameraCard extends HTMLElement {
     const fps = fpsState.state;
     const processFps = processFpsState.state;
     const cpu = parseFloat(cpuState.state);
-    const cpuPercent = Math.min(cpu, 100);
+    // Normaliza o percentual de CPU para um máximo de 5%
+    const cpuPercent = Math.min(cpu, 5) * 20; // Multiplica por 20 para que 5% represente 100% da barra
     const isPowerOn = switchState.state === 'on';
     
     // Define o estilo de fundo baseado nos valores de FPS
@@ -541,6 +542,8 @@ class CameraCard extends HTMLElement {
     
     if (elements.cpu) {
       elements.cpu.innerHTML = `${cpu}% <div class="cpu-bar" style="margin-left: 5px;"><div class="cpu-fill" style="width: ${cpuPercent}%"></div></div>`;
+      // Adiciona tooltip para informar sobre a escala modificada
+      elements.cpu.title = "Escala da barra: máximo de 5% de CPU";
     }
     
     // Informações de conexão
