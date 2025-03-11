@@ -76,32 +76,36 @@ _reconnectCamera() {
     return;
   }
   
-  // Certifique-se de usar o atributo correto que contém o MAC address da câmera
-  // O atributo 'mac' deve conter o endereço MAC do cliente (câmera)
-  const macAddress = apState.attributes.mac || '';
+  // Obter o MAC da câmera do formato original (com dois pontos)
+  let macAddress = apState.attributes.mac || '';
   
   if (!macAddress) {
     console.error('MAC address da câmera não encontrado');
     return;
   }
   
-  console.log('Tentando reconectar câmera com MAC:', macAddress);
+  // Converter o formato do MAC:
+  // 1. Substituir dois pontos por traços
+  // 2. Converter para maiúsculas
+  const formattedMac = macAddress.replace(/:/g, '-').toUpperCase();
   
-  // Chama o serviço tplink_omada.reconnect_client com o MAC da câmera
+  console.log('MAC original:', macAddress);
+  console.log('MAC formatado:', formattedMac);
+  
+  // Chamar o serviço com o MAC formatado corretamente
   this._hass.callService('tplink_omada', 'reconnect_client', {
-    mac: macAddress
+    mac: formattedMac
   }).then(() => {
-    // Opcional: Adicione uma notificação de sucesso
+    console.log('Comando de reconexão enviado com sucesso');
+    // Opcional: Adicionar uma notificação visual
     this._hass.callService('persistent_notification', 'create', {
       title: 'Câmera',
-      message: `Comando de reconexão enviado para a câmera (MAC: ${macAddress})`
+      message: `Comando de reconexão enviado para a câmera (MAC: ${formattedMac})`
     });
-    console.log('Comando de reconexão enviado com sucesso');
   }).catch(error => {
     console.error('Erro ao reconectar câmera:', error);
   });
 }
-
   // Função para alternar a alimentação da câmera
   _togglePower() {
     const switchState = this._hass.states[this.config.power_switch];
