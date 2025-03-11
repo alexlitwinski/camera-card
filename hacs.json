@@ -1,7 +1,7 @@
 {
   "name": "Camera Card",
   "render_readme": true,
-  "filename": "camera-card-v21.js",
+  "filename": "camera-card-v22.js",
   "content_in_root": true,
   "domains": ["sensor", "switch", "camera"]
 }
