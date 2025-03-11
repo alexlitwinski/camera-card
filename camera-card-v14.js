@@ -640,3 +640,14 @@ window.customCards.push({
         this.shadowRoot.querySelector('#card-header').addEventListener('click', () => this._openCameraView());
       }
     }
+// Registra o card personalizado
+customElements.define('camera-card', CameraCard);
+
+// Informações para o HACS
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: 'camera-card',
+  name: 'Camera Card',
+  description: 'Card de câmera com informações de desempenho e controles',
+  preview: true
+});
